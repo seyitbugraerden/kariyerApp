@@ -53,7 +53,7 @@ export default function Home() {
     [tab, setTab] = useState('discover'),
     [saved, setSaved] = useState<JobId[]>([]),
     [applied, setApplied] = useState<JobId[]>([]),
-    [hide, setHide] = useState(true),
+    [hide, setHide] = useState(false),
     [skills, setSkills] = useState<string[]>([]),
     [filename, setFilename] = useState(''),
     [modal, setModal] = useState(''),

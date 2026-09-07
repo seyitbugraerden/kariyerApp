@@ -4,10 +4,12 @@ import { Search, ArrowUpRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   platforms,
+  searchUrl,
   type PlatformId,
   type PlatformResult,
 } from '@/lib/platforms';
 import type { Job } from '@/lib/jobs';
+import BrowserSearch from '@/components/browser-search';
 export default function PlatformSearch({
   query,
   onQuery,
@@ -50,7 +52,6 @@ export default function PlatformSearch({
     setBusy(true);
     setMessage('');
     setStatuses([]);
-    onResults([]);
     try {
       const r = await fetch('/api/platform-search', {
         method: 'POST',
@@ -70,7 +71,7 @@ export default function PlatformSearch({
       };
       if (n !== sequence.current) return;
       if (!r.ok) throw Error(d.error || 'Arama tamamlanamadı.');
-      onResults(d.jobs);
+      if (d.jobs.length || d.sources.every(s => s.status === 'empty')) onResults(d.jobs);
       setStatuses(d.sources);
       setLast(term + ' · ' + (city && city !== 'TR' ? city : 'Türkiye'));
       setIndexConnected(d.indexConnected);
@@ -106,7 +107,7 @@ export default function PlatformSearch({
           onChange={(e) => onQuery(e.target.value)}
         />
         <Button className="search-button" type="submit" disabled={busy}>
-          {busy ? 'Taranıyor…' : 'Platformları tara'}
+          {busy ? 'Taranıyor…' : 'Sunucudan ara'}
         </Button>
       </form>
       <fieldset className="platform-picker">
@@ -141,11 +142,14 @@ export default function PlatformSearch({
           ))}
         </div>
       )}
-      <p className="platform-help">
-        Seçtiğin sitelerin ilk sonuç sayfaları taranır. İl ve diğer filtreler
-        getirilen ilanlara uygulanır; bütün ilanları kapsamaz. CV dosyan
-        paylaşılmaz, yalnızca arama metnin gönderilir.
-      </p>
+      <section className="manual-search-links">
+        <strong>Platformda ara, kendin başvur</strong>
+        <p>{query.trim() || skills[0] ? `Arama: “${query.trim() || skills[0]}”. Bağlantıyı aç, uygun ilanı seç ve platform üzerinden başvur.` : 'Bir pozisyon yaz veya yukarıdan CV becerini seç. Bağlantılar yazdıkça güncellenir.'}</p>
+        <div>{platforms.filter(p => selected.includes(p.id)).map(p => <a key={p.id} href={searchUrl(p.id, query.trim() || skills[0] || '', city === 'worldwide' ? 'TR' : city)} target="_blank" rel="noopener noreferrer"><span>{p.name}</span><ArrowUpRight size={16} /></a>)}</div>
+        <p className="platform-help">Eklenti veya API gerekmez. Bu bağlantılar arama sayfalarını açar; ilanlar Pusula’ya otomatik aktarılmaz. İl filtresini açılan sitede kontrol et. Yenibiriş’te arama kelimeni sitedeki kutuya gir.</p>
+      </section>
+      <details className="optional-extension"><summary>İlanları Pusula’ya toplamak için: tarayıcı eklentisi</summary><BrowserSearch query={query.trim() || skills[0] || ''} city={city === 'worldwide' ? 'TR' : city} selected={selected} onResults={onResults} /></details>
+      <p className="platform-help">“Sunucudan ara” alternatif yöntemdir; bazı platformlar bu erişimi engeller. Tarayıcı araması için yukarıdaki eklentiyi kur. İl ve diğer filtreler getirilen ilanlara uygulanır; bütün ilanları kapsamaz.</p>
       {busy && (
         <p className="platform-progress" role="status">
           Seçili platformlar araştırılıyor… Kaynaklara göre 10–30 saniye

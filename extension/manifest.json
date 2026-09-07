@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Pusula — Tarayıcımda iş ara",
+  "version": "1.0.0",
+  "description": "Seçtiğin iş sitelerinin açık sayfalarındaki ilanları Pusula’ya aktarır.",
+  "permissions": ["storage"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Pusula ilan aktarımı" },
+  "content_scripts": [
+    { "matches": ["https://pusula-is-arama.zeynepaktaserden.chatgpt.site/*"], "js": ["bridge.js"] },
+    { "matches": ["https://*.linkedin.com/*", "https://*.indeed.com/*", "https://*.kariyer.net/*", "https://*.isinolsun.com/*", "https://*.yenibiris.com/*", "https://*.eleman.net/*"], "js": ["reader.js"], "run_at": "document_idle" }
+  ]
+}
