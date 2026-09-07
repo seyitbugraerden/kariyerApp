@@ -18,65 +18,39 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { containsSkill } from '@/lib/matching';
+import { containsSkill, extractSkills } from '@/lib/matching';
+import {
+  cities,
+  normalizeText,
+  workLabels,
+  typeLabels,
+  levelLabels,
+} from '@/lib/turkey';
+import {
+  type Job,
+  type JobId,
+  type SourceStatus,
+  matchesLocation,
+} from '@/lib/jobs';
+import TurkeyPortals from '@/components/turkey-portals';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-type Job = {
-  id: number;
-  title: string;
-  company_name: string;
-  category: string;
-  tags: string[];
-  candidate_required_location: string;
-  salary: string;
-  publication_date: string;
-  url: string;
-  description: string;
-  job_type: string;
-};
-const vocabulary = [
-  'React',
-  'JavaScript',
-  'TypeScript',
-  'Python',
-  'SQL',
-  'Java',
-  'Figma',
-  'UX',
-  'UI',
-  'CSS',
-  'HTML',
-  'Node.js',
-  'Next.js',
-  'AWS',
-  'Docker',
-  'Excel',
-  'Power BI',
-  'Tableau',
-  'Sales',
-  'Marketing',
-  'SEO',
-  'Project Management',
-  'Product Management',
-  'Customer Support',
-  'Finance',
-  'Accounting',
-  'Kubernetes',
-  'Git',
-  'Agile',
-  'Scrum',
-  'Data Analysis',
-  'Machine Learning',
-];
 export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]),
+    [rememberedJobs, setRememberedJobs] = useState<Job[]>([]),
+    [manualJobs, setManualJobs] = useState<Job[]>([]),
+    [sources, setSources] = useState<SourceStatus[]>([]),
+    [workplace, setWorkplace] = useState(''),
+    [level, setLevel] = useState(''),
+    [jobType, setJobType] = useState(''),
+    [sourceFilter, setSourceFilter] = useState(''),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [query, setQuery] = useState(''),
     [category, setCategory] = useState(''),
-    [location, setLocation] = useState(''),
+    [location, setLocation] = useState('TR'),
     [tab, setTab] = useState('discover'),
-    [saved, setSaved] = useState<number[]>([]),
-    [applied, setApplied] = useState<number[]>([]),
+    [saved, setSaved] = useState<JobId[]>([]),
+    [applied, setApplied] = useState<JobId[]>([]),
     [hide, setHide] = useState(true),
     [skills, setSkills] = useState<string[]>([]),
     [filename, setFilename] = useState(''),
@@ -92,7 +66,8 @@ export default function Home() {
     setError('');
     try {
       const r = await fetch('/api/jobs');
-      const d = (await r.json()) as { jobs: Job[] };
+      const d = (await r.json()) as { jobs: Job[]; sources: SourceStatus[] };
+      setSources(d.sources || []);
       if (!r.ok) throw Error();
       setJobs(d.jobs);
     } catch {
@@ -111,9 +86,41 @@ export default function Home() {
       setApplied(d.applied || []);
       setSkills(d.skills || []);
       setFilename(d.filename || '');
+      const imported = JSON.parse(
+        localStorage.getItem('pusula-manual') || '[]',
+      );
+      if (Array.isArray(imported))
+        setManualJobs(
+          imported.filter(
+            (j) =>
+              j &&
+              j.manual &&
+              typeof j.id === 'string' &&
+              typeof j.title === 'string' &&
+              typeof j.description === 'string' &&
+              Array.isArray(j.tags),
+          ),
+        );
+      const history = JSON.parse(
+        localStorage.getItem('pusula-history') || '[]',
+      );
+      if (Array.isArray(history))
+        setRememberedJobs(
+          history.filter(
+            (j) =>
+              j &&
+              typeof j.title === 'string' &&
+              typeof j.description === 'string' &&
+              typeof j.company_name === 'string' &&
+              typeof j.source === 'string' &&
+              Array.isArray(j.tags) &&
+              typeof j.url === 'string' &&
+              j.url.startsWith('https://'),
+          ),
+        );
     } catch {}
   }, []);
-  function persist(s: number[], a: number[], sk = skills, f = filename) {
+  function persist(s: JobId[], a: JobId[], sk = skills, f = filename) {
     try {
       localStorage.setItem(
         'pusula-local',
@@ -126,6 +133,13 @@ export default function Home() {
     }
   }
   function toggle(j: Job, kind: string) {
+    const history = [j, ...rememberedJobs.filter((old) => old.id !== j.id)];
+    setRememberedJobs(history);
+    try {
+      localStorage.setItem('pusula-history', JSON.stringify(history));
+    } catch {
+      setMessage('İlan ayrıntıları saklanamadı; tarayıcı kayıt alanı dolu.');
+    }
     if (kind === 'saved') {
       const v = saved.includes(j.id)
         ? saved.filter((i) => i !== j.id)
@@ -140,12 +154,22 @@ export default function Home() {
       persist(saved, v);
     }
   }
+  function navigate(next: string) {
+    setTab(next);
+    setQuery('');
+    setCategory('');
+    setLocation(next === 'discover' ? 'TR' : '');
+    setWorkplace('');
+    setLevel('');
+    setJobType('');
+    setSourceFilter('');
+  }
   function analyze(text: string, name: string) {
     if (text.trim().length < 40)
       throw Error(
         'Yeterli metin okunamadı. Metin içeren PDF yükle veya CV metnini yapıştır.',
       );
-    const found = vocabulary.filter((s) => containsSkill(text, s));
+    const found = extractSkills(text);
     setSkills(found);
     setFilename(name);
     persist(saved, applied, found, name);
@@ -199,18 +223,53 @@ export default function Home() {
     skills.filter((s) =>
       containsSkill(j.title + ' ' + j.tags.join(' ') + ' ' + j.description, s),
     );
-  const filtered = jobs
+  function addManual(j: Job) {
+    const previous = manualJobs.find((m) => m.id === j.id);
+    if (previous) {
+      setMessage('Bu ilan zaten listende.');
+      return;
+    }
+    const updated = [j, ...manualJobs];
+    const bookmarks = [...saved, j.id];
+    setManualJobs(updated);
+    setSaved(bookmarks);
+    persist(bookmarks, applied);
+    try {
+      localStorage.setItem('pusula-manual', JSON.stringify(updated));
+    } catch {
+      setMessage('İlan bu oturuma eklendi; tarayıcı kayıt alanı dolu.');
+    }
+    setTab('saved');
+    setQuery('');
+    setLocation('');
+    setCategory('');
+    setWorkplace('');
+    setLevel('');
+    setJobType('');
+    setSourceFilter('');
+  }
+  const liveAndManual = [...manualJobs, ...jobs];
+  const allJobs = [
+    ...liveAndManual,
+    ...(tab === 'discover'
+      ? []
+      : rememberedJobs.filter(
+          (j) => !liveAndManual.some((live) => live.id === j.id),
+        )),
+  ];
+  const filtered = allJobs
     .filter(
       (j) =>
         (!query ||
-          (j.title + ' ' + j.company_name + ' ' + j.tags.join(' '))
-            .toLowerCase()
-            .includes(query.toLowerCase())) &&
+          normalizeText(
+            j.title + ' ' + j.company_name + ' ' + j.tags.join(' '),
+          ).includes(normalizeText(query))) &&
         (!category || j.category === category) &&
-        (!location ||
-          j.candidate_required_location
-            .toLowerCase()
-            .includes(location.toLowerCase())) &&
+        matchesLocation(j, location) &&
+        (!workplace || j.workplace === workplace) &&
+        (!level || j.level === level) &&
+        (!jobType || j.job_type === jobType) &&
+        (!sourceFilter || j.source === sourceFilter) &&
         (tab !== 'saved' || saved.includes(j.id)) &&
         (tab !== 'applied' || applied.includes(j.id)) &&
         (!(hide && tab !== 'applied') || !applied.includes(j.id)),
@@ -218,7 +277,8 @@ export default function Home() {
     .sort((a, b) =>
       sort === 'match'
         ? matches(b).length - matches(a).length
-        : Date.parse(b.publication_date) - Date.parse(a.publication_date),
+        : (Date.parse(b.publication_date) || 0) -
+          (Date.parse(a.publication_date) || 0),
     );
   useEffect(() => {
     const ctx = (
@@ -271,21 +331,21 @@ export default function Home() {
         <nav>
           <button
             className={'nav-item ' + (tab === 'discover' ? 'active' : '')}
-            onClick={() => setTab('discover')}
+            onClick={() => navigate('discover')}
           >
             <Compass />
             İş keşfet
           </button>
           <button
             className={'nav-item ' + (tab === 'saved' ? 'active' : '')}
-            onClick={() => setTab('saved')}
+            onClick={() => navigate('saved')}
           >
             <Bookmark />
             Kaydedilenler<small>{saved.length}</small>
           </button>
           <button
             className={'nav-item ' + (tab === 'applied' ? 'active' : '')}
-            onClick={() => setTab('applied')}
+            onClick={() => navigate('applied')}
           >
             <BriefcaseBusiness />
             Başvurularım<small>{applied.length}</small>
@@ -341,16 +401,19 @@ export default function Home() {
             <div>
               <div className="eyebrow">
                 <span />
-                YENİ BİR BA�?LANGIÇ
+                TÜRKİYE KARİYER ALANIN
               </div>
               <h1>
                 {tab === 'discover'
-                  ? 'Bir sonraki işini keşfet.'
+                  ? 'Türkiye’de bir sonraki işini keşfet.'
                   : tab === 'saved'
                     ? 'Aklında kalan fırsatlar.'
                     : 'Attığın adımları takip et.'}
               </h1>
-              <p>Yeteneklerinle eşleşen fırsatlar, kariyerinde yeni bir yön.</p>
+              <p>
+                Yerel fırsatlar, Türkçe CV eşleşmesi ve tek yerde başvuru
+                takibi.
+              </p>
             </div>
             <Compass className="heading-mark" size={62} strokeWidth={1} />
           </div>
@@ -411,7 +474,7 @@ export default function Home() {
                     onChange={(e) => setCategory(e.target.value)}
                   >
                     <option value="">Tüm alanlar</option>
-                    {Array.from(new Set(jobs.map((j) => j.category)))
+                    {Array.from(new Set(allJobs.map((j) => j.category)))
                       .sort()
                       .map((c) => (
                         <option key={c}>{c}</option>
@@ -425,17 +488,97 @@ export default function Home() {
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                   >
-                    <option value="">Tüm konumlar</option>
-                    <option value="Worldwide">Dünya geneli</option>
-                    <option value="Europe">Avrupa</option>
-                    <option value="Turkey">Türkiye</option>
+                    <option value="TR">Türkiye · tüm iller</option>
+                    {cities.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                    <option value="worldwide">
+                      Dünya geneline açık uzaktan
+                    </option>
+                    <option value="">Tüm ülkeler</option>
                   </select>
                 </label>
-                <span className="remote-chip">
-                  <span />
-                  Uzaktan çalışma
-                </span>
+                <label>
+                  <select
+                    aria-label="Çalışma şekli"
+                    value={workplace}
+                    onChange={(e) => setWorkplace(e.target.value)}
+                  >
+                    <option value="">Tüm çalışma şekilleri</option>
+                    {Object.entries(workLabels).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <select
+                    aria-label="Pozisyon seviyesi"
+                    value={level}
+                    onChange={(e) => setLevel(e.target.value)}
+                  >
+                    <option value="">Tüm seviyeler</option>
+                    {Object.entries(levelLabels).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <select
+                    aria-label="İstihdam türü"
+                    value={jobType}
+                    onChange={(e) => setJobType(e.target.value)}
+                  >
+                    <option value="">Tüm istihdam türleri</option>
+                    {Object.entries(typeLabels).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <select
+                    aria-label="İlan kaynağı"
+                    value={sourceFilter}
+                    onChange={(e) => setSourceFilter(e.target.value)}
+                  >
+                    <option value="">Tüm ilan kaynakları</option>
+                    {Array.from(new Set(allJobs.map((j) => j.source))).map(
+                      (s) => (
+                        <option key={s}>{s}</option>
+                      ),
+                    )}
+                  </select>
+                </label>
               </div>
+              <TurkeyPortals
+                query={query}
+                city={location}
+                skills={skills}
+                onAdd={addManual}
+              />
+              {sources.length > 0 && (
+                <div
+                  className="source-status"
+                  aria-label="İlan kaynağı durumları"
+                >
+                  {sources.map((s) => (
+                    <span
+                      className={s.status === 'error' ? 'source-error' : ''}
+                      key={s.name}
+                    >
+                      {s.status === 'ok' ? '✓' : '!'} {s.name} ·{' '}
+                      {s.status === 'ok' ? s.count + ' ilan' : 'ulaşılamadı'}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="results-heading">
                 <h2>
                   {tab === 'discover'
@@ -451,7 +594,7 @@ export default function Home() {
                   onChange={(e) => setSort(e.target.value)}
                 >
                   <option value="match">Beceri eşleşmesi</option>
-                  <option value="date">En yeni ilanlar</option>
+                  <option value="date">Kaynak tarihine göre</option>
                 </select>
               </div>
               <div className="hide-row">
@@ -464,23 +607,18 @@ export default function Home() {
                   Başvurduğum ilanları gizle
                 </label>
                 <span>
-                  Kaynak:{' '}
-                  <a
-                    href="https://remotive.com"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Remotive ↗
-                  </a>
+                  {location === 'TR'
+                    ? 'Türkiye konumlu ilanlar'
+                    : 'Seçili konumlardaki ilanlar'}
                 </span>
               </div>
-              {loading ? (
+              {loading && !manualJobs.length ? (
                 <div className="empty">
                   <Compass className="spin" size={32} />
                   <h3>Fırsatlar aranıyor…</h3>
                   <p>Güncel ilanlar getiriliyor.</p>
                 </div>
-              ) : error ? (
+              ) : error && !manualJobs.length ? (
                 <div className="empty">
                   <h3>Bağlantı kurulamadı</h3>
                   <p>{error}</p>
@@ -503,6 +641,10 @@ export default function Home() {
                       setQuery('');
                       setCategory('');
                       setLocation('');
+                      setWorkplace('');
+                      setLevel('');
+                      setJobType('');
+                      setSourceFilter('');
                       setTab('discover');
                     }}
                   >
@@ -513,17 +655,23 @@ export default function Home() {
                 filtered.slice(0, 80).map((j) => (
                   <article className="job-card" key={j.id}>
                     <div className="job-top">
-                      <span className={'company-logo color-' + (j.id % 4)}>
+                      <span
+                        className={
+                          'company-logo color-' + (j.company_name.length % 4)
+                        }
+                      >
                         {j.company_name.slice(0, 2).toUpperCase()}
                       </span>
                       <div className="job-title">
                         <span>
                           {j.company_name} ·{' '}
                           <small>
-                            {new Date(j.publication_date).toLocaleDateString(
-                              'tr-TR',
-                              { day: 'numeric', month: 'short' },
-                            )}
+                            {j.publication_date
+                              ? new Date(j.publication_date).toLocaleDateString(
+                                  'tr-TR',
+                                  { day: 'numeric', month: 'short' },
+                                )
+                              : 'Tarih belirtilmemiş'}
                           </small>
                         </span>
                         <button onClick={() => setDetail(j)}>
@@ -552,13 +700,27 @@ export default function Home() {
                       </span>
                       <span>
                         <BriefcaseBusiness size={14} />
-                        {j.job_type === 'full_time'
-                          ? 'Tam zamanlı'
-                          : j.job_type === 'contract'
-                            ? 'Sözleşmeli'
-                            : 'Uzaktan'}
+                        {typeLabels[j.job_type] || 'Belirtilmemiş'}
+                      </span>
+                      <span>
+                        {workLabels[j.workplace] ||
+                          'Çalışma şekli belirtilmemiş'}
                       </span>
                     </div>
+                    <a
+                      className="job-source"
+                      href={j.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {j.source} ↗
+                    </a>
+                    {!j.manual && !jobs.some((live) => live.id === j.id) && (
+                      <p className="source-note">
+                        Güncel kaynak listesinde görünmüyor. Başvuru durumunu
+                        kaynaktan kontrol et.
+                      </p>
+                    )}
                     <div className="tags">
                       {(j.tags.length ? j.tags : [j.category])
                         .slice(0, 4)
@@ -583,8 +745,11 @@ export default function Home() {
                 ))
               )}
               <p className="source-note">
-                Remotive ilanları 24 saat gecikmeli sunulur. Konum ve çalışma
-                izni koşullarını ilan üzerinden kontrol et.
+                Doğrudan liste: Trendyol, Insider One ve Dream Games’in Türkiye
+                konumlu ilanları. Tüm Türkiye pazarını kapsamaz. Pozisyon
+                seviyesi ilan başlığından tahmin edilir; belirtilmeyen deneyim
+                koşullarını kaynaktan kontrol et. Remotive ilanları 24 saat
+                gecikmelidir ve “Tüm ülkeler” seçeneğinde bulunur.
                 {filtered.length > 80
                   ? ' İlk 80 sonuç gösteriliyor. Aramayla daraltabilirsin.'
                   : ''}
@@ -744,7 +909,7 @@ export default function Home() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Remotive’de başvur <ArrowUpRight size={16} />
+                    İlanın kaynağında başvur <ArrowUpRight size={16} />
                   </a>
                   <Button
                     variant="outline"
