@@ -60,6 +60,22 @@ export const skillGroups: string[][] = [
   ['Scrum'],
   ['.NET'],
   ['Unity'],
+  ['NestJS', 'Nest.js'],
+  ['Vue.js', 'VueJS', 'Vue'],
+  ['PostgreSQL', 'Postgres'],
+  ['MongoDB'],
+  ['Tailwind CSS', 'Tailwind'],
+  ['REST API', 'RESTful'],
+  ['SignalR'],
+  ['WebSocket', 'WebSockets'],
+  ['MQTT'],
+  ['Jest'],
+  ['Playwright'],
+  ['Cloudflare'],
+  ['CI/CD', 'GitHub Actions', 'Azure Pipelines'],
+  ['React Native'],
+  ['Flutter'],
+  ['Redis'],
 ];
 function exactSkill(text: string, skill: string) {
   const escaped = normalizeText(skill.trim()).replace(

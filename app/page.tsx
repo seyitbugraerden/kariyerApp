@@ -18,7 +18,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { containsSkill, extractSkills } from '@/lib/matching';
+import { containsSkill } from '@/lib/matching';
 import {
   cities,
   normalizeText,
@@ -34,6 +34,8 @@ import {
 } from '@/lib/jobs';
 import TurkeyPortals from '@/components/turkey-portals';
 import PlatformSearch from '@/components/platform-search';
+import CvReport from '@/components/cv-report';
+import { analyzeCv, type CvAnalysis } from '@/lib/cv-analysis';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]),
@@ -56,6 +58,8 @@ export default function Home() {
     [hide, setHide] = useState(false),
     [skills, setSkills] = useState<string[]>([]),
     [filename, setFilename] = useState(''),
+    [analysis, setAnalysis] = useState<CvAnalysis | null>(null),
+    [cvError, setCvError] = useState(''),
     [modal, setModal] = useState(''),
     [cvText, setCvText] = useState(''),
     [busy, setBusy] = useState(false),
@@ -88,6 +92,11 @@ export default function Home() {
       setApplied(d.applied || []);
       setSkills(d.skills || []);
       setFilename(d.filename || '');
+      const report = JSON.parse(localStorage.getItem('pusula-cv-analysis') || 'null');
+      if (report?.version === 1 && report.filename === d.filename && Array.isArray(report.skills) && Array.isArray(report.roles) && Array.isArray(report.otherMentions) && typeof report.characters === 'number') {
+        setAnalysis(report);
+        setQuery(report.roles[0]?.title || report.skills[0] || '');
+      }
       const imported = JSON.parse(
         localStorage.getItem('pusula-manual') || '[]',
       );
@@ -166,16 +175,20 @@ export default function Home() {
     setJobType('');
     setSourceFilter('');
   }
-  function analyze(text: string, name: string) {
-    if (text.trim().length < 40)
-      throw Error(
-        'Yeterli metin okunamadı. Metin içeren PDF yükle veya CV metnini yapıştır.',
-      );
-    const found = extractSkills(text);
+  function analyze(text: string, name: string, pages?: number) {
+    const report = analyzeCv(text, pages);
+    const found = report.skills;
+    setAnalysis(report);
+    setCvError('');
+    try { localStorage.setItem('pusula-cv-analysis', JSON.stringify({ ...report, filename: name })); } catch {}
     setSkills(found);
     setFilename(name);
     persist(saved, applied, found, name);
     setModal('');
+    navigate('discover');
+    setQuery(report.roles[0]?.title || found[0] || '');
+    setSort('match');
+    setCvText('');
     setMessage(
       found.length
         ? `${found.length} beceri bulundu. İlanlar becerilerine göre sıralandı.`
@@ -185,22 +198,25 @@ export default function Home() {
   async function upload(file?: File) {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      setMessage('En fazla 10 MB dosya seç.');
+      setCvError('En fazla 10 MB dosya seç.');
       return;
     }
     setBusy(true);
+    setCvError('');
     try {
       let text = '';
+      let pages: number | undefined;
       if (file.name.toLowerCase().endsWith('.pdf')) {
-        const p = await import('pdfjs-dist');
-        p.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+        const p = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        p.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs?compat=legacy-6.3.289';
         const task = p.getDocument({ data: await file.arrayBuffer() });
-        const doc = await task.promise;
         try {
+          const doc = await task.promise;
+          pages = doc.numPages;
           for (let i = 1; i <= Math.min(doc.numPages, 30); i++) {
             const c = await (await doc.getPage(i)).getTextContent();
             text +=
-              c.items.map((it) => ('str' in it ? it.str : '')).join(' ') + '\n';
+              c.items.map((it) => ('str' in it ? it.str + (it.hasEOL ? '\n' : ' ') : '')).join('') + '\n';
           }
         } finally {
           await task.destroy();
@@ -213,9 +229,10 @@ export default function Home() {
       } else if (file.name.toLowerCase().endsWith('.txt'))
         text = await file.text();
       else throw Error('PDF, DOCX veya TXT seç.');
-      analyze(text, file.name);
+      analyze(text, file.name, pages);
     } catch (e) {
-      setMessage((e as Error).message);
+      const reason = e instanceof Error ? e.message : '';
+      setCvError(/password/i.test(reason) ? 'PDF parola korumalı. Parolasız bir kopya yükle veya metnini yapıştır.' : /CV’den|PDF, DOCX/.test(reason) ? reason : 'Dosya okunamadı. PDF/DOCX dosyasını yeniden seç veya CV metnini aşağıya yapıştır.');
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -457,6 +474,7 @@ export default function Home() {
               <span>PDF, DOCX veya TXT · En fazla 10 MB</span>
             </div>
           </section>
+          <CvReport analysis={analysis} filename={filename} onSearch={q => { navigate('discover'); setQuery(q); }} onUpload={() => setModal('upload')} />
           <div className="content-grid">
             <section className="results">
               <PlatformSearch
@@ -991,6 +1009,11 @@ export default function Home() {
                       .filter(Boolean)
                       .slice(0, 40);
                     setSkills(v);
+                    if (analysis) {
+                      const updated = { ...analysis, skills: v };
+                      setAnalysis(updated);
+                      try { localStorage.setItem('pusula-cv-analysis', JSON.stringify({ ...updated, filename })); } catch {}
+                    }
                     persist(saved, applied, v);
                     setModal('');
                   }}
@@ -1002,6 +1025,8 @@ export default function Home() {
                   onClick={() => {
                     setSkills([]);
                     setFilename('');
+                    setAnalysis(null);
+                    try { localStorage.removeItem('pusula-cv-analysis'); } catch {}
                     persist(saved, applied, [], '');
                     setModal('');
                   }}
@@ -1020,6 +1045,8 @@ export default function Home() {
                 </span>
                 <h2>Bir sonraki adım, CV’n.</h2>
                 <p>Becerilerini çıkaralım, sana uygun ilanları öne alalım.</p>
+                {cvError && <p className="cv-upload-error" role="alert">{cvError}</p>}
+                {busy && <p role="status">CV metni okunuyor ve beceriler çıkarılıyor…</p>}
                 <button
                   className="dropzone"
                   disabled={busy}
@@ -1051,7 +1078,7 @@ export default function Home() {
                     try {
                       analyze(cvText, 'Yapıştırılan CV');
                     } catch (e) {
-                      setMessage((e as Error).message);
+                      setCvError((e as Error).message);
                     }
                   }}
                 >

@@ -170,3 +170,17 @@
 .optional-extension { margin-top:16px; font-size:14px; }
 .optional-extension > summary { cursor:pointer; color:#456555; }
 @media(max-width:600px) { .manual-search-links > div { grid-template-columns:repeat(2,1fr); } }
+.cv-report { margin:0 0 24px; padding:22px; border:1px solid #b6d5c7; background:#f3faf6; border-radius:12px; }
+.cv-report h2 { font-size:21px; color:#163d32; margin:0 0 8px; }
+.cv-report h3 { font-size:16px; margin:18px 0 10px; }
+.cv-report p { font-size:14px; line-height:1.7; margin:8px 0; overflow-wrap:anywhere; }
+.cv-read-success { color:#246b4b; font-weight:600; }
+.cv-role-list { display:flex; gap:12px; flex-wrap:wrap; }
+.cv-role-list > div { display:flex; flex-direction:column; gap:6px; }
+.cv-role-list small { max-width:260px; font-size:13px; color:#53685c; }
+.cv-skill-list { display:flex; flex-wrap:wrap; gap:8px; }
+.cv-skill-list button { font-size:14px; border:1px solid #b6d5c7; border-radius:6px; background:white; color:#24593f; padding:7px 10px; cursor:pointer; }
+.cv-report details { margin-top:16px; font-size:14px; }
+.cv-report summary { cursor:pointer; }
+.cv-analysis-note { color:#53685c; }
+.cv-upload-error { background:#fff0ed; border:1px solid #dfa89c; color:#8d3026; border-radius:8px; padding:12px; font-size:15px; }
