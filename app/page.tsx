@@ -33,9 +33,11 @@ import {
   matchesLocation,
 } from '@/lib/jobs';
 import TurkeyPortals from '@/components/turkey-portals';
+import PlatformSearch from '@/components/platform-search';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]),
+    [platformJobs, setPlatformJobs] = useState<Job[]>([]),
     [rememberedJobs, setRememberedJobs] = useState<Job[]>([]),
     [manualJobs, setManualJobs] = useState<Job[]>([]),
     [sources, setSources] = useState<SourceStatus[]>([]),
@@ -248,7 +250,11 @@ export default function Home() {
     setJobType('');
     setSourceFilter('');
   }
-  const liveAndManual = [...manualJobs, ...jobs];
+  const liveAndManual = [
+    ...new Map(
+      [...jobs, ...platformJobs, ...manualJobs].map((j) => [j.id, j]),
+    ).values(),
+  ];
   const allJobs = [
     ...liveAndManual,
     ...(tab === 'discover'
@@ -453,18 +459,16 @@ export default function Home() {
           </section>
           <div className="content-grid">
             <section className="results">
-              <form className="searchbar" onSubmit={(e) => e.preventDefault()}>
-                <Search size={20} />
-                <input
-                  aria-label="İlan ara"
-                  placeholder="Pozisyon, şirket veya beceri ara"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <Button className="search-button" type="submit">
-                  İş ara
-                </Button>
-              </form>
+              <PlatformSearch
+                query={query}
+                onQuery={setQuery}
+                city={location}
+                skills={skills}
+                onResults={(rows) => {
+                  setPlatformJobs(rows);
+                  setTab('discover');
+                }}
+              />
               <div className="filters">
                 <label>
                   <SlidersHorizontal size={16} />
@@ -715,10 +719,18 @@ export default function Home() {
                     >
                       {j.source} ↗
                     </a>
-                    {!j.manual && !jobs.some((live) => live.id === j.id) && (
+                    {!j.manual &&
+                      !liveAndManual.some((live) => live.id === j.id) && (
+                        <p className="source-note">
+                          Güncel kaynak listesinde görünmüyor. Başvuru durumunu
+                          kaynaktan kontrol et.
+                        </p>
+                      )}
+                    {j.summaryOnly && (
                       <p className="source-note">
-                        Güncel kaynak listesinde görünmüyor. Başvuru durumunu
-                        kaynaktan kontrol et.
+                        {j.indexResult
+                          ? 'Arama dizini özeti · güncellik ve konum doğrulanmadı'
+                          : 'İlan başlığı / özeti · tam metin kaynaktadır'}
                       </p>
                     )}
                     <div className="tags">
@@ -734,7 +746,7 @@ export default function Home() {
                       >
                         <Sparkles size={15} />
                         {skills.length
-                          ? `${matches(j).length} / ${skills.length} becerin eşleşiyor`
+                          ? `${matches(j).length} / ${skills.length} beceri${j.summaryOnly ? ' özette eşleşiyor' : ' eşleşiyor'}`
                           : 'Eşleşmeyi görmek için CV ekle'}
                       </span>
                       <button onClick={() => setDetail(j)}>
@@ -745,11 +757,12 @@ export default function Home() {
                 ))
               )}
               <p className="source-note">
-                Doğrudan liste: Trendyol, Insider One ve Dream Games’in Türkiye
-                konumlu ilanları. Tüm Türkiye pazarını kapsamaz. Pozisyon
-                seviyesi ilan başlığından tahmin edilir; belirtilmeyen deneyim
-                koşullarını kaynaktan kontrol et. Remotive ilanları 24 saat
-                gecikmelidir ve “Tüm ülkeler” seçeneğinde bulunur.
+                Platform araması erişilebilen ilk sonuç sayfalarını getirir.
+                Özetlerdeki beceri eşleşmesi sınırlıdır; tam metni ve ilan
+                güncelliğini kaynaktan kontrol et. Pozisyon seviyesi başlıktan
+                tahmin edilir. Ek şirket akışları: Trendyol, Insider One ve
+                Dream Games. Remotive, “Tüm ülkeler” seçeneğindedir ve 24 saat
+                gecikmelidir.
                 {filtered.length > 80
                   ? ' İlk 80 sonuç gösteriliyor. Aramayla daraltabilirsin.'
                   : ''}

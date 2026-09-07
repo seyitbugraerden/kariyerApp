@@ -1,0 +1,151 @@
+.platform-picker {
+  border: 0;
+  padding: 0;
+  margin: 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.platform-picker legend {
+  font-size: 12px;
+  color: #6b7e72;
+  margin-bottom: 7px;
+}
+.platform-picker label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 7px 9px;
+  border: 1px solid #d7e3da;
+  background: white;
+  border-radius: 6px;
+}
+.platform-picker input {
+  accent-color: #24775c;
+  width: 13px;
+  height: 13px;
+}
+.platform-help {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #778d7c;
+  margin: 9px 0 14px;
+}
+.platform-message {
+  font-size: 14px;
+  color: #8a6229;
+  background: #fff3df;
+  border-radius: 7px;
+  padding: 10px 13px;
+  margin: 12px 0;
+}
+.platform-progress {
+  color: #327457;
+  font-size: 14px;
+  margin: 14px 0;
+}
+.platform-statuses {
+  margin: 14px 0 20px;
+}
+.platform-statuses summary {
+  font-size: 13px;
+  cursor: pointer;
+  color: #476e56;
+}
+.platform-statuses > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.platform-status {
+  padding: 11px 12px;
+  border: 1px solid #dce6dc;
+  border-radius: 7px;
+  background: white;
+}
+.platform-status > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.platform-status strong {
+  font-size: 13px;
+}
+.platform-status > div span {
+  font-size: 11px;
+  color: #438160;
+}
+.platform-status p {
+  font-size: 12px;
+  color: #708976;
+  line-height: 1.6;
+  margin: 7px 0;
+}
+.platform-status a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #507b5d;
+}
+.platform-status.blocked,
+.platform-status.error {
+  border-color: #e4d9c4;
+  background: #fffcf7;
+}
+.platform-status.blocked > div span,
+.platform-status.error > div span {
+  color: #9a713e;
+}
+.cv-search-skills {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #617e68;
+}
+.cv-search-skills > span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.cv-search-skills button {
+  border: 1px solid #dce7dc;
+  background: #eff5eb;
+  padding: 4px 8px;
+  border-radius: 5px;
+  color: #53775b;
+  font-size: 12px;
+}
+.platform-search .search-button {
+  font-size: 12px !important;
+  padding-inline: 13px !important;
+}
+.platform-search input {
+  font-size: 14px;
+}
+@media (max-width: 600px) {
+  .platform-statuses > div {
+    grid-template-columns: 1fr;
+  }
+  .platform-picker {
+    gap: 5px;
+  }
+  .platform-picker label {
+    font-size: 11px;
+  }
+  .platform-search .searchbar {
+    flex-wrap: wrap;
+  }
+  .platform-search .searchbar input {
+    min-width: 140px;
+  }
+  .platform-search .search-button {
+    margin-left: auto;
+  }
+}

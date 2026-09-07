@@ -18,6 +18,8 @@ export type Job = {
   workplace: string;
   level: string;
   manual?: boolean;
+  summaryOnly?: boolean;
+  indexResult?: boolean;
 };
 export const boards = [
   { id: 'trendyol', name: 'Trendyol' },
@@ -212,6 +214,7 @@ export function normalizeRemotive(raw: Record<string, unknown>): Job | null {
 }
 export function matchesLocation(j: Job, location: string) {
   if (!location) return true;
+  if (j.indexResult) return location === 'TR';
   if (location === 'TR') return j.country === 'TR';
   if (location === 'worldwide')
     return /worldwide|anywhere/i.test(j.candidate_required_location);

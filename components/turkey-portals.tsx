@@ -14,6 +14,7 @@ import {
 } from '@/lib/turkey';
 import { extractSkills } from '@/lib/matching';
 import { department, type Job } from '@/lib/jobs';
+import { platformJobKey } from '@/lib/platforms';
 export default function TurkeyPortals({
   query,
   city,
@@ -45,7 +46,7 @@ export default function TurkeyPortals({
     const portal = portalForUrl(url);
     if (!portal) {
       setMessage(
-        'Kariyer.net, Yenibiriş, Secretcv, İŞKUR veya LinkedIn üzerinden bir HTTPS ilan bağlantısı ekle.',
+        'Desteklenen kariyer platformlarından bir HTTPS ilan bağlantısı ekle.',
       );
       return;
     }
@@ -58,7 +59,7 @@ export default function TurkeyPortals({
     }
     const canonical = canonicalJobUrl(url);
     onAdd({
-      id: 'manual:' + canonical,
+      id: platformJobKey(canonical),
       url: canonical,
       title,
       company_name: company,

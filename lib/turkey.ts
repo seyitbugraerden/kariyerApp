@@ -124,6 +124,17 @@ export function inferLevel(title: string) {
   return 'unknown';
 }
 export const portals = [
+  { name: 'Indeed', url: 'https://tr.indeed.com/', host: 'indeed.com' },
+  {
+    name: 'İşin Olsun',
+    url: 'https://isinolsun.com/is-ilanlari',
+    host: 'isinolsun.com',
+  },
+  {
+    name: 'Eleman.net',
+    url: 'https://www.eleman.net/is-ilanlari',
+    host: 'eleman.net',
+  },
   {
     name: 'Kariyer.net',
     url: 'https://www.kariyer.net/is-ilanlari',
